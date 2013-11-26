@@ -10,12 +10,16 @@ idObst = find(stateSpace);
 
 %Free spots
 freeStates = find(~stateSpace);
-B = NaN(size(freeStates));
+
+%initial assumptions 4 direction moving and sensing
+numSensedDirections=4;
+
+% Pre-alocation of sparse matrix
+A = spalloc (gridLateral,gridLateral,gridLateral*4);
+B = spalloc(numel(freeStates),2^(numSensedDirections),numel(freeStates)); %Depending on number of directions measured
 
 %Compute reduced form of B
 for iStates = 1:numel(freeStates)
-    
-    %initial assumptions 4 direction moving and sensing
     
     %pre process each position
     pos = freeStates(iStates);
@@ -27,8 +31,33 @@ for iStates = 1:numel(freeStates)
     sensArray = ~([ Adj(1) <= gridLateral^2;rem(Adj(2),gridLateral) ~= 0;
                     Adj(3) > 0;rem(Adj(4),gridLateral) ~= 1] & ... %borders
                     ~ismember(Adj,idObst)); %obstacles
-    B(iStates) = bi2de(sensArray');
+    
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    % Create Matrix B
+    % Go through all the possible measuments (this case = 2⁴ = 16 possibilities)
+    for kMeasurement = 1: ( 2^(numel(Adj)  )  )
+        
+        if  (kMeasurement-1)== bi2de(sensArray')
+            B(iStates,kMeasurement)=1;
+        end
+    end
+    
+     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    % Create Matrix A
+    for jPsbStates=1: numSensedDirections
+        
+        if sensArray(jPsbStates)==0;
+            A(pos,Adj(jPsbStates))= 1/ sum(sensArray);
+        end
+    end
+    
 end
+
+% Vizualization of matrix B and A
+spy(B);title('Matrix B');pause; close;
+figure();
+spy(A); title('Matrix A');pause; close ;
+
 
 %% Initial state probability and correspodent image generation
 Pi = ones(size(freeStates))/numel(freeStates);
