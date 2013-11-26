@@ -1,5 +1,4 @@
 %% Offline Computation
-
 %grid alteral size
 gridLateral = 10;
 
