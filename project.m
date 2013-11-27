@@ -55,22 +55,32 @@ for iStates = 1:numel(freeStates)
     
      %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     % Create Matrix A
-    Adj
-    sensArray
+  
     for jPsbStates=1: numSensedDirections
         
         if sensArray(jPsbStates)==0;
-            A(pos,Adj(jPsbStates))= 1/ sum(sensArray);
+%             if  Adj(jPsbStates)>numel(freeStates)
+%                 pause
+%             end
+            A(iStates ,  find( Adj(jPsbStates)==freeStates))= 1;
         end
         
     end
+    sumFullARow=sum(full(A(iStates,:)));
+    
+    A(iStates,:)=A(iStates,:) ./ sumFullARow;
     
 end
 
+
 % Vizualization of matrix B and A
-spy(B); title('Matrix B');pause(0.5); close;
+spy(B); title('Matrix B');pause(0.5); 
+close;
 figure();
-spy(A); title('Matrix A');pause(0.5); close ;
+spy(A); title('Matrix A');pause(0.5); 
+close ;
+% rescalledA=(full(A));
+% figure();imshow(rescalledA,[0 1]);pause;
 
 
 %% Initial state probability and correspodent image generation
@@ -143,7 +153,7 @@ set(gca,'ButtonDownFcn','out = true;');
 % initial assumptions 4 direction moving and sensing
 out = false;
 
-% while ~out
+while ~out
     
     %%%%%%%%%%%%%%%%%%%%
     % Where can you go?
@@ -196,7 +206,7 @@ out = false;
     %%%%%%%%%%%%%%%%%%%%
     % What can 
     %%%%%%%%%%%%%%%%%%%%
-%     pause(0.5)
-% end
+    pause(0.5)
+end
 
 close(hFigure)
