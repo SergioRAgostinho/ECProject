@@ -3,10 +3,10 @@ clc;
 
 %% Offline Computation
 %grid alteral size
-gridLateral = 10;
+gridLateral = 100;
 
 %random occupancy
-stateSpace = rand(gridLateral)<0.1;
+stateSpace = rand(gridLateral)<0.05;
 
 
 %obstacles
@@ -14,6 +14,7 @@ idObst = find(stateSpace);
 
 %Free spots
 freeStates = find(~stateSpace);
+nFreeStates = numel(freeStates);
 
 %initial assumptions 4 direction moving and sensing
 numSensedDirections=4;
@@ -39,22 +40,16 @@ for iStates = 1:numel(freeStates)
                     rem(Adj(4),gridLateral) ~= 1] & ... %borders
                     ~ismember(Adj,idObst)); %obstacles
 
-   
-
-    
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     % Create Matrix B
-    % Go through all the possible measuments (this case = 2⁴ = 16 possibilities)
-    for kMeasurement = 1: ( 2^(numel(Adj)  )  )
-        
-        if  (kMeasurement-1)== bi2de(sensArray')
-            B(iStates,kMeasurement)=1;
-        end
-    end
+    B(iStates, bi2de(sensArray')+1)=1;
+    
     
     
      %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     % Create Matrix A
+    
+%     ~sensArray./sum(~sensArray)
   
     for jPsbStates=1: numSensedDirections
         
@@ -72,22 +67,22 @@ for iStates = 1:numel(freeStates)
     
 end
 
-
-% Vizualization of matrix B and A
-spy(B); title('Matrix B');pause(0.5); 
-close;
-figure();
-spy(A); title('Matrix A');pause(0.5); 
-close ;
-% rescalledA=(full(A));
-% figure();imshow(rescalledA,[0 1]);pause;
-
+% 
+% % Vizualization of matrix B and A
+% spy(B); title('Matrix B');pause(0.5); 
+% close;
+% figure();
+% spy(A); title('Matrix A');pause(0.5); 
+% close ;
+% % rescalledA=(full(A));
+% % figure();imshow(rescalledA,[0 1]);pause;
+% 
 
 %% Initial state probability and correspodent image generation
 Pi = ones(size(freeStates))/numel(freeStates);
 
 imPi = NaN(gridLateral);
-imAlpha = NaN(gridLateral);
+% imAlpha = NaN(gridLateral);
 imPi(freeStates) = Pi;
 
 
@@ -107,32 +102,33 @@ pos = pos0;
 Adj = [pos + gridLateral; pos-1; pos - gridLateral; pos+1];
 
 % sonar's response
-y_1 = bi2de((~([ Adj(1) <= gridLateral^2;rem(Adj(2),gridLateral) ~= 0;
+sensInt = ~([ Adj(1) <= gridLateral^2;rem(Adj(2),gridLateral) ~= 0;
                 Adj(3) > 0;rem(Adj(4),gridLateral) ~= 1] & ... %borders
-                ~ismember(Adj,idObst)))'); %obstacles
-            
-collB=B(:,y_1 + 1); % select collum of B that corresponds to sonar meas.
+                ~ismember(Adj,idObst)); %obstacles
+y_1 = bi2de(sensInt') + 1;
+
+collB=B(:,y_1); % select collum of B that corresponds to sonar meas.
 [rows, cols, vals]=find(collB);
 D= sparse(rows,rows,vals,numel(collB),numel(collB)); % constr. D as diag(collB)
-sparseD=diag(collB,0);
+% sparseD=diag(collB,0);
 
 
 alpha=D*Pi;
-alpha_old = alpha;
-imPi(freeStates) = Pi; 
+alpha_old = alpha./sum(alpha);
+imPi(freeStates) = alpha_old; 
 
-%the following 4 lines only have debug purpose-----------------------------
-imAlpha(freeStates)= alpha/max(max(alpha));  figure(9);  imshow(imAlpha);
-figure(10); colorStateSpace(:,:,1)=255*uint8(stateSpace); colorStateSpace(:,:,2)=255*uint8(stateSpace); 
-colorStateSpace(:,:,3)=255*uint8(stateSpace);  
-[idy,idx]=ind2sub([gridLateral,gridLateral],pos); colorStateSpace(idy,idx,:)=[255,0,0];
-imshow(colorStateSpace); pause;  
-%--------------------------------------------------------------------------
+% %the following 4 lines only have debug purpose-----------------------------
+% imAlpha(freeStates)= alpha/max(max(alpha));  falpha_oldigure(9);  imshow(imAlpha);
+% figure(10); colorStateSpace(:,:,1)=255*uint8(stateSpace); colorStateSpace(:,:,2)=255*uint8(stateSpace); 
+% colorStateSpace(:,:,3)=255*uint8(stateSpace);  
+% [idy,idx]=ind2sub([gridLateral,gridLateral],pos); colorStateSpace(idy,idx,:)=[255,0,0];
+% imshow(colorStateSpace); pause;  
+% %--------------------------------------------------------------------------
 
 
 %% Quick visualization
 hFigure = figure(1);
-[iy,ix]=ind2sub([gridLateral,gridLateral],[idObst;pos]); %% Acho que os indices estão trocados
+[iy,ix]=ind2sub([gridLateral,gridLateral],[idObst;pos]); 
 hImage = image(imPi);
 hold on
 hPlot = plot(ix(1:end-1),iy(1:end-1),'xg',ix(end),iy(end),'.k');
@@ -158,41 +154,43 @@ while ~out
     %%%%%%%%%%%%%%%%%%%%
     % Where can you go?
     %%%%%%%%%%%%%%%%%%%%
-    
-    % adjacent positions in linear indexing
-    Adj = [pos + gridLateral; pos-1; pos - gridLateral; pos+1];
-    
-    %Get the sensor output intensity
-    sensInt=find(B(find(pos==freeStates),:)); 
-    
+        
     % elegible positions to move aka opposite of sonar's response
-
-    elegAdj = ~de2bi(sensInt - 1,4)';
+    elegAdj = ~sensInt;
     psbMov = Adj(elegAdj);
-%     a_i = ones(size(psbMov))./numel(psbMov);
+
     
     % Movement decision
-    pos = datasample(Adj(elegAdj),1);
+    pos = datasample(psbMov,1);
     
     % draw updated position
     [iy,ix]=ind2sub([gridLateral,gridLateral],pos);
     set(hPlot(2),'XData',ix(end),'YData',iy(end));
     
     %%%%%%%%%%%%%%%%%%%%
-    % Where can I be?
+    % What can I see?
     %%%%%%%%%%%%%%%%%%%%
-%     sensInt =  B(pos == freeStates)
-%     alpha = (B == sensInt);
-
+    
+    % adjacent positions in linear indexing
+    Adj = [pos + gridLateral; pos-1; pos - gridLateral; pos+1];
+    
+    %Get the sensor output intensity
+    y_j = find(B(pos==freeStates,:));
+    sensInt=de2bi(y_j - 1,4)'; 
+    
 
     % building D
-    [rows, cols, vals]=find(B(find(pos==freeStates) ,:));
-    
-    D= sparse(rows,rows,vals,numel(collB),numel(collB)); % constr. D as diag(collB)
+    D = sparse(1:nFreeStates,1:nFreeStates,B(:,y_j), ...
+                nFreeStates,nFreeStates);
     
     alpha= D * A' * alpha_old;
         
-    alpha_old=alpha;
+    alpha_old=alpha/sum(alpha);
+    
+    %Update images
+    imPi(freeStates) = alpha_old.^(1/2);
+    
+    set(hImage,'CData',imPi);
     
 %     for j = find(alpha)
 %         
@@ -206,7 +204,8 @@ while ~out
     %%%%%%%%%%%%%%%%%%%%
     % What can 
     %%%%%%%%%%%%%%%%%%%%
-    pause(0.5)
+    
+    pause(.01)
 end
 
 close(hFigure)
