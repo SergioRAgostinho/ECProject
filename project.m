@@ -188,7 +188,7 @@ while ~out
     alpha_old=alpha/sum(alpha);
     
     %Update images
-    imPi(freeStates) = alpha_old.^(1/2);
+    imPi(freeStates) = alpha_old;
     
     set(hImage,'CData',imPi);
     
