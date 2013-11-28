@@ -3,6 +3,7 @@ clc;
 
 %% Offline Computation
 %grid alteral size
+tic
 gridLateral = 100;
 
 %random occupancy
@@ -17,18 +18,19 @@ freeStates = find(~stateSpace);
 nFreeStates = numel(freeStates);
 
 %initial assumptions 4 direction moving and sensing
-numSensedDirections=4;
+nSensDir = 4;
+nMovDir = 4;
 
-% Pre-alocation of sparse matrix
-A = spalloc (numel(freeStates),numel(freeStates),numel(freeStates)*4);
-B = spalloc(numel(freeStates),2^(numSensedDirections),numel(freeStates)); %Depending on number of directions measured
+% Pre-alocations of sparse matrix
+A = spalloc (nFreeStates,nFreeStates,nFreeStates*nMovDir);
+% B = spalloc(nFreeStates,2^nSensDir,nFreeStates); %Depending on number of directions measured
+sensMatrix = false(nFreeStates,nSensDir);
 
 %Compute reduced form of B
-for iStates = 1:numel(freeStates)
+for iState = 1:numel(freeStates)
     
     %pre process each position
-    pos = freeStates(iStates);
-%     pos=iStates
+    pos = freeStates(iState);
     
     %adjacent positions in linear indexing
     Adj = [pos + gridLateral; pos-1; pos - gridLateral; pos+1];
@@ -39,66 +41,50 @@ for iStates = 1:numel(freeStates)
                     Adj(3) > 0; 
                     rem(Adj(4),gridLateral) ~= 1] & ... %borders
                     ~ismember(Adj,idObst)); %obstacles
-
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    % Create Matrix B
-    B(iStates, bi2de(sensArray')+1)=1;
     
+    sensMatrix(iState,:) = sensArray';
+
+   
     
     
      %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    % Create Matrix A
-    
-%     ~sensArray./sum(~sensArray)
+     % Create Matrix A reducao 23 para 6 segs
+     % Dá para optimizar mais but...
+     
+     elegAdj = ~sensArray;
+     probAdj = elegAdj/sum(elegAdj);
+     
+     [~,idx] = ismember(Adj(elegAdj),freeStates);
+     
+     A(iState , idx)= probAdj(elegAdj)';
   
-    for jPsbStates=1: numSensedDirections
-        
-        if sensArray(jPsbStates)==0;
-%             if  Adj(jPsbStates)>numel(freeStates)
-%                 pause
-%             end
-            A(iStates ,  find( Adj(jPsbStates)==freeStates))= 1;
-        end
-        
-    end
-    sumFullARow=sum(full(A(iStates,:)));
-    
-    A(iStates,:)=A(iStates,:) ./ sumFullARow;
     
 end
 
-% 
-% % Vizualization of matrix B and A
-% spy(B); title('Matrix B');pause(0.5); 
-% close;
-% figure();
-% spy(A); title('Matrix A');pause(0.5); 
-% close ;
-% % rescalledA=(full(A));
-% % figure();imshow(rescalledA,[0 1]);pause;
-% 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Create Matrix B    Melhoria de 2 Segundos
+B = sparse(1:nFreeStates,bi2de(sensMatrix)+1,1, ...
+    nFreeStates,2^nSensDir);
 
+clear sensMatrix
+toc
 %% Initial state probability and correspodent image generation
 Pi = ones(size(freeStates))/numel(freeStates);
 
 imPi = NaN(gridLateral);
-% imAlpha = NaN(gridLateral);
 imPi(freeStates) = Pi;
 
+filename = 'animation.gif';
 
-%% Online 
+
+% Online 
 
 % Robot initialization
-% pos0 = freeStates(randi(numel(freeStates),1));
 pos0 = datasample(freeStates,1);
 pos = pos0;
 
 % Initial Filtering
-% sensInt =  B(pos == freeStates);
-% alpha = (B == sensInt).*Pi;
-% Pi = alpha./sum(alpha);
-
-%adjacent positions in linear indexing
+% adjacent positions in linear indexing
 Adj = [pos + gridLateral; pos-1; pos - gridLateral; pos+1];
 
 % sonar's response
@@ -117,34 +103,36 @@ alpha=D*Pi;
 alpha_old = alpha./sum(alpha);
 imPi(freeStates) = alpha_old; 
 
-% %the following 4 lines only have debug purpose-----------------------------
-% imAlpha(freeStates)= alpha/max(max(alpha));  falpha_oldigure(9);  imshow(imAlpha);
-% figure(10); colorStateSpace(:,:,1)=255*uint8(stateSpace); colorStateSpace(:,:,2)=255*uint8(stateSpace); 
-% colorStateSpace(:,:,3)=255*uint8(stateSpace);  
-% [idy,idx]=ind2sub([gridLateral,gridLateral],pos); colorStateSpace(idy,idx,:)=[255,0,0];
-% imshow(colorStateSpace); pause;  
-% %--------------------------------------------------------------------------
 
 
-%% Quick visualization
+% Quick visualization
 hFigure = figure(1);
 [iy,ix]=ind2sub([gridLateral,gridLateral],[idObst;pos]); 
+
 hImage = image(imPi);
 hold on
+
 hPlot = plot(ix(1:end-1),iy(1:end-1),'xg',ix(end),iy(end),'.k');
-%rectangle('Position',[0,0,gridLateral+1,gridLateral+1]);
 xlim([-1,gridLateral+2])
 ylim([-1,gridLateral+2])
-hAxis = gca; pause(2);
+hAxis = gca; 
 hold off
 
 set(hAxis,'CLim',[0 1])
 set(hImage,'CDataMapping','scaled')
 
 
-%% Stop if mouse button is pressed
+% Stop if mouse button is pressed
 set(hFigure,'ButtonDownFcn','out = true;');
 set(gca,'ButtonDownFcn','out = true;');
+
+%Image writing
+drawnow
+frame = getframe(1);
+im = frame2im(frame);
+[imind,cm] = rgb2ind(im,256);
+
+imwrite(imind,cm,filename,'gif', 'Loopcount',inf,'DelayTime',0.2);
 
 % initial assumptions 4 direction moving and sensing
 out = false;
@@ -188,24 +176,19 @@ while ~out
     alpha_old=alpha/sum(alpha);
     
     %Update images
-    imPi(freeStates) = alpha_old;
-    
+    imPi(freeStates) = alpha_old.^(1/2);
     set(hImage,'CData',imPi);
     
-%     for j = find(alpha)
-%         
-%     end
+   
+    pause(0.01)
     
-    %%%%%%%%%%%%%%%%%%%%
-    % Move
-    %%%%%%%%%%%%%%%%%%%
-
-
-    %%%%%%%%%%%%%%%%%%%%
-    % What can 
-    %%%%%%%%%%%%%%%%%%%%
+    %Animation part
+    drawnow
+    frame = getframe(1);
+    im = frame2im(frame);
+    [imind,cm] = rgb2ind(im,256);
     
-    pause(.01)
+    imwrite(imind,cm,filename,'gif','WriteMode','append');
 end
 
 close(hFigure)

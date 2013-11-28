@@ -1,3 +1,7 @@
 #matlab temp files
 *.*~
-*.*~
+
+#animated gifs
+*.gif
+
+
