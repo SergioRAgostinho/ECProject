@@ -19,7 +19,7 @@ nFreeStates = numel(freeStates);
 
 %initial assumptions 4 direction moving and sensing
 nSensDir = 4;
-nMovDir = 4;
+nMovDir = 5;
 
 % Pre-alocations of sparse matrix
 A = spalloc (nFreeStates,nFreeStates,nFreeStates*nMovDir);
@@ -49,11 +49,11 @@ for iState = 1:numel(freeStates)
      %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
      % Create Matrix A reducao 23 para 6 segs
      % Dá para optimizar mais but...
-     
-     elegAdj = ~sensArray;
+     augAdj = [Adj; pos];
+     elegAdj = [~sensArray; true];
      probAdj = elegAdj/sum(elegAdj);
      
-     [~,idx] = ismember(Adj(elegAdj),freeStates);
+     [~,idx] = ismember(augAdj(elegAdj),freeStates);
      
      A(iState , idx)= probAdj(elegAdj)';
   
@@ -74,7 +74,7 @@ imPi = NaN(gridLateral);
 imPi(freeStates) = Pi;
 
 %Animation
-filename = 'animation.gif';
+filename = 'animation_neigh5.gif';
 animation = false;
 
 % Online 
@@ -137,7 +137,7 @@ if animation
     imwrite(imind,cm,filename,'gif', 'Loopcount',inf,'DelayTime',0.1);
 end
 
-% initial assumptions 4 direction moving and sensing
+
 out = false;
 
 while ~out
@@ -147,8 +147,11 @@ while ~out
     %%%%%%%%%%%%%%%%%%%%
         
     % elegible positions to move aka opposite of sonar's response
-    elegAdj = ~sensInt;
-    psbMov = Adj(elegAdj);
+    augAdj = [Adj; pos];
+    elegAdj = [~sensInt;true];
+    psbMov = augAdj(elegAdj);
+    
+     
 
     
     % Movement decision
