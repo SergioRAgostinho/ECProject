@@ -74,8 +74,9 @@ Pi = ones(size(freeStates))/numel(freeStates);
 imPi = NaN(gridLateral);
 imPi(freeStates) = Pi;
 
+%Animation
 filename = 'animation.gif';
-
+animation = false;
 
 % Online 
 
@@ -126,13 +127,16 @@ set(hImage,'CDataMapping','scaled')
 set(hFigure,'ButtonDownFcn','out = true;');
 set(gca,'ButtonDownFcn','out = true;');
 
-%Image writing
-drawnow
-frame = getframe(1);
-im = frame2im(frame);
-[imind,cm] = rgb2ind(im,256);
 
-imwrite(imind,cm,filename,'gif', 'Loopcount',inf,'DelayTime',0.2);
+%Image writing
+if animation
+    drawnow
+    frame = getframe(1);
+    im = frame2im(frame);
+    [imind,cm] = rgb2ind(im,256);
+
+    imwrite(imind,cm,filename,'gif', 'Loopcount',inf,'DelayTime',0.1);
+end
 
 % initial assumptions 4 direction moving and sensing
 out = false;
@@ -183,12 +187,14 @@ while ~out
     pause(0.01)
     
     %Animation part
-    drawnow
-    frame = getframe(1);
-    im = frame2im(frame);
-    [imind,cm] = rgb2ind(im,256);
-    
-    imwrite(imind,cm,filename,'gif','WriteMode','append');
+    if animation
+        drawnow
+        frame = getframe(1);
+        im = frame2im(frame);
+        [imind,cm] = rgb2ind(im,256);
+
+        imwrite(imind,cm,filename,'gif','WriteMode','append');
+    end
 end
 
 close(hFigure)
