@@ -4,10 +4,15 @@ clc;
 %% Offline Computation
 %grid alteral size
 tic
-gridLateral = 100;
+gridLateral = 10;
 
 %random occupancy
 stateSpace = rand(gridLateral)<0.05;
+% stateSpace = zeros(gridLateral);
+% stateSpace(1:end,1) = 1;
+% stateSpace(1,1:end) = 1;
+% stateSpace(1:end,end) = 1;
+% stateSpace(end,1:end) = 1;
 
 
 %obstacles
@@ -73,6 +78,7 @@ Pi = ones(size(freeStates))/numel(freeStates);
 imPi = NaN(gridLateral);
 imPi(freeStates) = Pi;
 
+
 %Animation
 filename = 'animation.gif';
 animation = false;
@@ -83,7 +89,36 @@ animation = false;
 pos0 = datasample(freeStates,1);
 pos = pos0;
 
-% Initial Filtering
+% Quick visualization
+hFigure = figure(1);
+[iy,ix]=ind2sub([gridLateral,gridLateral],[idObst;pos]); 
+
+hImage = image(imPi);
+hold on
+
+hPlot = plot(ix(1:end-1),iy(1:end-1),'sk', ...
+             ix(end),iy(end),'.r');
+axis([0,gridLateral+1, 0, gridLateral+1])
+set(hPlot,'MarkerSize',25*10/gridLateral)
+rectangle('Position',[0.5, 0.5, gridLateral, gridLateral])
+hAxis = gca; 
+hold off
+
+set(hAxis,'CLim',[0 1])
+set(hImage,'CDataMapping','scaled')
+colormap(flipud(colormap(bone)))
+
+
+% Stop if mouse button is pressed
+set(hFigure,'ButtonDownFcn','out = true;');
+set(gca,'ButtonDownFcn','out = true;');
+
+axis equal
+colorbar
+
+
+
+%% Initial Filtering
 % adjacent positions in linear indexing
 Adj = [pos + gridLateral; pos-1; pos - gridLateral; pos+1];
 
@@ -103,28 +138,7 @@ alpha=D*Pi;
 alpha_old = alpha./sum(alpha);
 imPi(freeStates) = alpha_old; 
 
-
-
-% Quick visualization
-hFigure = figure(1);
-[iy,ix]=ind2sub([gridLateral,gridLateral],[idObst;pos]); 
-
-hImage = image(imPi);
-hold on
-
-hPlot = plot(ix(1:end-1),iy(1:end-1),'xg',ix(end),iy(end),'.k');
-xlim([-1,gridLateral+2])
-ylim([-1,gridLateral+2])
-hAxis = gca; 
-hold off
-
-set(hAxis,'CLim',[0 1])
-set(hImage,'CDataMapping','scaled')
-
-
-% Stop if mouse button is pressed
-set(hFigure,'ButtonDownFcn','out = true;');
-set(gca,'ButtonDownFcn','out = true;');
+set(hImage,'CData',imPi);
 
 
 %Image writing
@@ -139,6 +153,8 @@ end
 
 % initial assumptions 4 direction moving and sensing
 out = false;
+
+%% pause()
 
 while ~out
     
@@ -179,11 +195,11 @@ while ~out
     alpha_old=alpha/sum(alpha);
     
     %Update images
-    imPi(freeStates) = alpha_old.^(1/2);
+    imPi(freeStates) = alpha_old;%.^(1/2);
     set(hImage,'CData',imPi);
     
    
-    pause(0.01)
+    pause(0.005)
     
     %Animation part
     if animation

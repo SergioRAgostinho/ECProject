@@ -1,22 +1,16 @@
 clear all;
 clc;
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%5
-% Sensing: 8 neighb. with error
-% Movement: 8 neighb. + don't move
-% 
-
-
 %% Offline Computation
 %grid alteral size
 tic
 gridLateral = 10;
 
 %random occupancy
-stateSpace = rand(gridLateral)<0.05;
-% stateSpace = zeros(gridLateral);
-% stateSpace(2:end-1,51) = 1;
-% stateSpace(51,2:end-1) = 1;
+% stateSpace = rand(gridLateral)<0.05;
+stateSpace = zeros(gridLateral);
+stateSpace([3,8,10],9) = 1;
+stateSpace(6:7,6) = 1;
 
 %obstacles
 idObst = find(stateSpace);
@@ -26,14 +20,12 @@ freeStates = find(~stateSpace);
 nFreeStates = numel(freeStates);
 
 %initial assumptions 4 direction moving and sensing
-nSensDir = 8;
+nSensDir = 4;
 nMovDir = 5;
 
 % Pre-alocations of sparse matrix
 A = spalloc (nFreeStates,nFreeStates,nFreeStates*nMovDir);
-% sensMatrix = false(nFreeStates,nSensDir);
-B = zeros(nFreeStates,2^nSensDir);
-sensAcc = 0.8;
+sensMatrix = false(nFreeStates,nSensDir);
 
 %Compute reduced form of B
 for iState = 1:numel(freeStates)
@@ -42,35 +34,23 @@ for iState = 1:numel(freeStates)
     pos = freeStates(iState);
     
     %adjacent positions in linear indexing
-    Adj = [pos + gridLateral; pos + gridLateral - 1;
-           pos-1; pos - gridLateral - 1; 
-           pos - gridLateral; pos - gridLateral + 1;
-           pos + 1; pos + gridLateral + 1];
+    Adj = [pos + gridLateral; pos-1; pos - gridLateral; pos+1];
     
     % sonar's response
-    borders = [ Adj(1) <= gridLateral^2;
-                rem(Adj(3),gridLateral) ~= 0;
-                Adj(5) > 0; 
-                rem(Adj(7),gridLateral) ~= 1];
-                
-    sensArray = ~([borders(1); borders(1) & borders(2);
-                   borders(2); borders(2) & borders(3);
-                   borders(3); borders(3) & borders(4);
-                   borders(4); borders(4) & borders(1)] & ... %borders
-                   ~ismember(Adj,idObst)); %obstacles
-             
-   
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    % Create Matrix B    Melhoria de 2 Segundos
-    b_j = bi2de(sensArray')+1;
+    sensArray = ~([ Adj(1) <= gridLateral^2;
+                    rem(Adj(2),gridLateral) ~= 0;
+                    Adj(3) > 0; 
+                    rem(Adj(4),gridLateral) ~= 1] & ... %borders
+                    ~ismember(Adj,idObst)); %obstacles
     
-    B(iState,[1:b_j-1,b_j+1:end]) = (1-sensAcc)/(2^nSensDir-1);
-    B(iState,b_j) = sensAcc;
+    sensMatrix(iState,:) = sensArray';
+
+   
     
     
      %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
      % Create Matrix A reducao 23 para 6 segs
-     % Da para optimizar mais, but...
+     % Dá para optimizar mais but...
      augAdj = [Adj; pos];
      elegAdj = [~sensArray; true];
      probAdj = elegAdj/sum(elegAdj);
@@ -78,11 +58,14 @@ for iState = 1:numel(freeStates)
      [~,idx] = ismember(augAdj(elegAdj),freeStates);
      
      A(iState , idx)= probAdj(elegAdj)';
-     
+  
     
 end
 
-
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Create Matrix B    Melhoria de 2 Segundos
+B = sparse(1:nFreeStates,bi2de(sensMatrix)+1,1, ...
+    nFreeStates,2^nSensDir);
 
 clear sensMatrix
 toc
@@ -93,13 +76,14 @@ imPi = NaN(gridLateral);
 imPi(freeStates) = Pi;
 
 %Animation
-filename = 'animation_neigh8_move9_obserror.gif';
+filename = 'animation_neigh5.gif';
 animation = false;
 
 % Online 
 
 % Robot initialization
 pos0 = datasample(freeStates,1);
+pos0 = 97;
 pos = pos0;
 
 % Quick visualization
@@ -129,35 +113,18 @@ set(gca,'ButtonDownFcn','out = true;');
 axis equal
 colorbar
 
+grid on
+set(gca,'XTick',1:10,'YTick',1:10)
+
 %% Initial Filtering
 % adjacent positions in linear indexing
-Adj = [pos + gridLateral; pos + gridLateral - 1;
-       pos-1; pos - gridLateral - 1; 
-       pos - gridLateral; pos - gridLateral + 1;
-       pos + 1; pos + gridLateral + 1];
-
+Adj = [pos + gridLateral; pos-1; pos - gridLateral; pos+1];
 
 % sonar's response
-borders = [ Adj(1) <= gridLateral^2;
-            rem(Adj(3),gridLateral) ~= 0;
-            Adj(5) > 0; 
-            rem(Adj(7),gridLateral) ~= 1];
-        
-sensInt = ~([borders(1); borders(1) & borders(2);
-               borders(2); borders(2) & borders(3);
-               borders(3); borders(3) & borders(4);
-               borders(4); borders(4) & borders(1)] & ... %borders
-               ~ismember(Adj,idObst)); %obstacles
-
-% error mechanism in the observations         
-nr = bi2de(sensInt') + 1;
-if rand(1) <= sensAcc
-    y_1 = nr;
-else
-    y_1 = datasample([1:nr-1,nr+1:2^nSensDir],1);
-end
-
-% disp([y_1 nr])
+sensInt = ~([ Adj(1) <= gridLateral^2;rem(Adj(2),gridLateral) ~= 0;
+                Adj(3) > 0;rem(Adj(4),gridLateral) ~= 1] & ... %borders
+                ~ismember(Adj,idObst)); %obstacles
+y_1 = bi2de(sensInt') + 1;
 
 collB=B(:,y_1); % select collum of B that corresponds to sonar meas.
 [rows, cols, vals]=find(collB);
@@ -173,20 +140,13 @@ set(hImage,'CData',imPi);
 
 
 
-%Image writing
-if animation
-    drawnow
-    frame = getframe(1);
-    im = frame2im(frame);
-    [imind,cm] = rgb2ind(im,256);
-
-    imwrite(imind,cm,filename,'gif', 'Loopcount',inf,'DelayTime',0.1);
-end
-
-
 out = false;
 
-while ~out
+n = 0;
+movList = [96;86;87;77;67;68;58;59];
+
+%% Cycle
+% while ~out
     
     %%%%%%%%%%%%%%%%%%%%
     % Where can you go?
@@ -203,6 +163,13 @@ while ~out
     % Movement decision
     pos = datasample(psbMov,1);
     
+    %scripted movement
+    n = n + 1;
+    if n <= numel(movList)
+        pos = movList(n);
+    end
+    
+    
     % draw updated position
     [iy,ix]=ind2sub([gridLateral,gridLateral],pos);
     set(hPlot(2),'XData',ix(end),'YData',iy(end));
@@ -212,32 +179,11 @@ while ~out
     %%%%%%%%%%%%%%%%%%%%
     
     % adjacent positions in linear indexing
-    Adj = [pos + gridLateral; pos + gridLateral - 1;
-           pos-1; pos - gridLateral - 1; 
-           pos - gridLateral; pos - gridLateral + 1;
-           pos + 1; pos + gridLateral + 1];
+    Adj = [pos + gridLateral; pos-1; pos - gridLateral; pos+1];
     
-    %Get the sensor output intensity    
-    borders = [ Adj(1) <= gridLateral^2;
-                rem(Adj(3),gridLateral) ~= 0;
-                Adj(5) > 0; 
-                rem(Adj(7),gridLateral) ~= 1];
-
-    sensInt = ~([borders(1); borders(1) & borders(2);
-                   borders(2); borders(2) & borders(3);
-                   borders(3); borders(3) & borders(4);
-                   borders(4); borders(4) & borders(1)] & ... %borders
-                   ~ismember(Adj,idObst)); %obstacles
-
-    % error mechanism in the observations         
-    nr = bi2de(sensInt') + 1;
-    if rand(1) <= sensAcc
-        y_j = nr;
-    else
-        y_j = datasample([1:nr-1,nr+1:2^nSensDir],1);
-    end
-     
-%     disp([y_j nr])
+    %Get the sensor output intensity
+    y_j = find(B(pos==freeStates,:));
+    sensInt=de2bi(y_j - 1,4)'; 
     
 
     % building D
@@ -253,7 +199,7 @@ while ~out
     set(hImage,'CData',imPi);
     
    
-    pause(0.05)
+    pause(0.1)
     
     %Animation part
     if animation
@@ -264,6 +210,6 @@ while ~out
 
         imwrite(imind,cm,filename,'gif','WriteMode','append');
     end
-end
-
-close(hFigure)
+% end
+% 
+% close(hFigure)

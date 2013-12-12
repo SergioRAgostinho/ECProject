@@ -7,7 +7,10 @@ tic
 gridLateral = 10;
 
 %random occupancy
-stateSpace = rand(gridLateral)<0.05;
+% stateSpace = rand(gridLateral)<0.05;
+stateSpace = zeros(gridLateral);
+stateSpace([3,8,10],9) = 1;
+stateSpace(6:7,6) = 1;
 
 
 %obstacles
@@ -19,7 +22,7 @@ nFreeStates = numel(freeStates);
 
 %initial assumptions 4 direction moving and sensing
 nSensDir = 4;
-nMovDir = 5;
+nMovDir = 4;
 
 % Pre-alocations of sparse matrix
 A = spalloc (nFreeStates,nFreeStates,nFreeStates*nMovDir);
@@ -49,11 +52,11 @@ for iState = 1:numel(freeStates)
      %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
      % Create Matrix A reducao 23 para 6 segs
      % Dá para optimizar mais but...
-     augAdj = [Adj; pos];
-     elegAdj = [~sensArray; true];
+     
+     elegAdj = ~sensArray;
      probAdj = elegAdj/sum(elegAdj);
      
-     [~,idx] = ismember(augAdj(elegAdj),freeStates);
+     [~,idx] = ismember(Adj(elegAdj),freeStates);
      
      A(iState , idx)= probAdj(elegAdj)';
   
@@ -73,14 +76,16 @@ Pi = ones(size(freeStates))/numel(freeStates);
 imPi = NaN(gridLateral);
 imPi(freeStates) = Pi;
 
+
 %Animation
-filename = 'animation_neigh5.gif';
+filename = 'animation.gif';
 animation = false;
 
 % Online 
 
 % Robot initialization
 pos0 = datasample(freeStates,1);
+pos0 = 97;
 pos = pos0;
 
 % Quick visualization
@@ -93,7 +98,7 @@ hold on
 hPlot = plot(ix(1:end-1),iy(1:end-1),'sk', ...
              ix(end),iy(end),'.r');
 axis([0,gridLateral+1, 0, gridLateral+1])
-set(hPlot,'MarkerSize',25*10/gridLateral)
+set(hPlot,'MarkerSize',25)
 rectangle('Position',[0.5, 0.5, gridLateral, gridLateral])
 hAxis = gca; 
 hold off
@@ -110,7 +115,8 @@ set(gca,'ButtonDownFcn','out = true;');
 axis equal
 colorbar
 
-
+grid on
+set(gca,'XTick',1:10,'YTick',1:10)
 
 %% Initial Filtering
 % adjacent positions in linear indexing
@@ -135,21 +141,30 @@ imPi(freeStates) = alpha_old;
 set(hImage,'CData',imPi);
 
 
+%Image writing
+if animation
+    drawnow
+    frame = getframe(1);
+    im = frame2im(frame);
+    [imind,cm] = rgb2ind(im,256);
 
+    imwrite(imind,cm,filename,'gif', 'Loopcount',inf,'DelayTime',0.1);
+end
+
+% initial assumptions 4 direction moving and sensing
 out = false;
 
-while ~out
+%% pause()
+
+% while ~out
     
     %%%%%%%%%%%%%%%%%%%%
     % Where can you go?
     %%%%%%%%%%%%%%%%%%%%
         
     % elegible positions to move aka opposite of sonar's response
-    augAdj = [Adj; pos];
-    elegAdj = [~sensInt;true];
-    psbMov = augAdj(elegAdj);
-    
-     
+    elegAdj = ~sensInt;
+    psbMov = Adj(elegAdj);
 
     
     % Movement decision
@@ -180,11 +195,11 @@ while ~out
     alpha_old=alpha/sum(alpha);
     
     %Update images
-    imPi(freeStates) = alpha_old.^(1/2);
+    imPi(freeStates) = alpha_old;%.^(1/2);
     set(hImage,'CData',imPi);
     
    
-    pause(0.1)
+%     pause()
     
     %Animation part
     if animation
@@ -195,6 +210,6 @@ while ~out
 
         imwrite(imind,cm,filename,'gif','WriteMode','append');
     end
-end
+% end
 
-close(hFigure)
+% close(hFigure)

@@ -13,10 +13,10 @@ tic
 gridLateral = 10;
 
 %random occupancy
-stateSpace = rand(gridLateral)<0.05;
-% stateSpace = zeros(gridLateral);
-% stateSpace(2:end-1,51) = 1;
-% stateSpace(51,2:end-1) = 1;
+% stateSpace = rand(gridLateral)<0.05;
+stateSpace = zeros(gridLateral);
+stateSpace([3,8,10],9) = 1;
+stateSpace(6:7,6) = 1;
 
 %obstacles
 idObst = find(stateSpace);
@@ -100,6 +100,7 @@ animation = false;
 
 % Robot initialization
 pos0 = datasample(freeStates,1);
+pos0 = 97;
 pos = pos0;
 
 % Quick visualization
@@ -128,6 +129,9 @@ set(gca,'ButtonDownFcn','out = true;');
 
 axis equal
 colorbar
+
+grid on
+set(gca,'XTick',1:10,'YTick',1:10)
 
 %% Initial Filtering
 % adjacent positions in linear indexing
@@ -186,7 +190,11 @@ end
 
 out = false;
 
-while ~out
+n = 0;
+movList = [96;86;87;77;67;68;58;59];
+
+%% Cycle
+% while ~out
     
     %%%%%%%%%%%%%%%%%%%%
     % Where can you go?
@@ -202,6 +210,12 @@ while ~out
     
     % Movement decision
     pos = datasample(psbMov,1);
+    %scripted movement
+    n = n + 1;
+    if n <= numel(movList)
+        pos = movList(n);
+    end
+    
     
     % draw updated position
     [iy,ix]=ind2sub([gridLateral,gridLateral],pos);
@@ -264,6 +278,6 @@ while ~out
 
         imwrite(imind,cm,filename,'gif','WriteMode','append');
     end
-end
-
-close(hFigure)
+% end
+% 
+% close(hFigure)
